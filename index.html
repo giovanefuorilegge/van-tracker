@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dove siamo</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #f0f0f0; }
+
+    #map { width: 100%; height: 100vh; }
+
+    #admin-btn {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      z-index: 1000;
+      background: rgba(255,255,255,0.6);
+      border: 0.5px solid #ccc;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      color: #aaa;
+      cursor: pointer;
+    }
+    #admin-btn:hover { background: rgba(255,255,255,0.9); color: #666; }
+
+    #admin-overlay {
+      display: none;
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+    #admin-overlay.open { display: flex; }
+
+    #admin-panel {
+      background: #fff;
+      border-radius: 14px;
+      padding: 24px;
+      width: 340px;
+      max-width: 95vw;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    #admin-panel h2 { font-size: 15px; font-weight: 500; margin-bottom: 16px; color: #333; }
+    .section-title { font-size: 12px; font-weight: 500; color: #999; text-transform: uppercase; letter-spacing: 0.06em; margin: 14px 0 8px; }
+    .row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+    .row label { font-size: 13px; color: #666; min-width: 70px; }
+    input[type=text], input[type=number], input[type=password] {
+      border: 0.5px solid #ccc;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 13px;
+      outline: none;
+      width: 100%;
+    }
+    input[type=range] { width: 100%; }
+    button {
+      border: 0.5px solid #bbb;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      background: #fff;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    button:hover { background: #f5f5f5; }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .close-btn { float: right; font-size: 18px; background: none; border: none; cursor: pointer; color: #aaa; }
+    .sep { border: none; border-top: 0.5px solid #eee; margin: 12px 0; }
+    .wp-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #555; padding: 4px 0; border-bottom: 0.5px solid #eee; }
+    .remove-btn { font-size: 11px; color: #c00; border: none; background: none; cursor: pointer; }
+    .status { font-size: 12px; color: #888; margin-top: 8px; min-height: 16px; }
+    .speed-row { display: flex; align-items: center; gap: 8px; }
+    .speed-row label { font-size: 13px; color: #666; }
+
+    #truck-marker {
+      animation: squish 0.55s ease-in-out infinite alternate;
+      transform-origin: bottom center;
+    }
+    @keyframes squish {
+      0%   { transform: scaleY(1)    scaleX(1)    translateY(0px); }
+      40%  { transform: scaleY(1.06) scaleX(0.96) translateY(-7px); }
+      100% { transform: scaleY(0.94) scaleX(1.05) translateY(5px); }
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+<button id="admin-btn" onclick="askPassword()">⚙</button>
+
+<div id="admin-overlay">
+  <div id="admin-panel">
+    <button class="close-btn" onclick="closeAdmin()">×</button>
+    <h2>Pannello admin</h2>
+
+    <div class="section-title">Posizione statica</div>
+    <div class="row">
+      <label>Indirizzo</label>
+      <input type="text" id="addr-input" placeholder="es. Via Roma 1, Milano"/>
+      <button onclick="geocodeAddress()">Vai</button>
+    </div>
+    <div class="row">
+      <label>Lat / Lng</label>
+      <input type="number" id="lat-input" placeholder="Lat" step="0.0001" style="width:90px;"/>
+      <input type="number" id="lng-input" placeholder="Lng" step="0.0001" style="width:90px;"/>
+      <button onclick="setManual()">OK</button>
+    </div>
+
+    <hr class="sep">
+
+    <div class="section-title">Percorso dinamico</div>
+    <div class="row">
+      <label>Tappa</label>
+      <input type="text" id="wp-input" placeholder="es. Bergamo"/>
+      <button onclick="addWaypoint()">+ Aggiungi</button>
+    </div>
+    <div id="wp-list"></div>
+
+    <div class="speed-row" style="margin-top:10px;">
+      <label>Velocità</label>
+      <input type="range" id="speed" min="1" max="10" value="4" step="1"/>
+      <span id="speed-out" style="font-size:13px; min-width:16px;">4</span>
+    </div>
+
+    <div class="btn-row">
+      <button onclick="startRoute()">Avvia</button>
+      <button onclick="pauseRoute()">Pausa</button>
+      <button onclick="resetRoute()">Reset</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const PASSWORD = "filarmonica";  // <-- cambia qui la tua password
+
+  var map = L.map('map', { zoomControl: true }).setView([45.464, 9.19], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
+
+  var truckSVG = `
+  <div id="truck-marker">
+    <svg width="110" height="60" viewBox="0 0 220 110" xmlns="http://www.w3.org/2000/svg">
+      <path d="M 20 75 L 20 48 Q 20 35 32 30 L 80 22 L 160 22 Q 185 22 195 35 L 200 48 L 200 75 Z" fill="#b5b5b5"/>
+      <path d="M 32 30 Q 20 35 20 48 L 20 38 Q 22 28 34 24 L 80 22 L 160 22 Q 183 22 193 33 L 195 35 Q 185 22 160 22 L 80 22 Z" fill="#cecece"/>
+      <rect x="20" y="65" width="180" height="10" rx="3" fill="#888"/>
+      <path d="M 155 24 Q 185 24 196 38 L 196 52 L 150 52 Z" fill="#cce4f7"/>
+      <line x1="173" y1="24" x2="173" y2="52" stroke="#aac" stroke-width="1"/>
+      <rect x="108" y="26" width="36" height="20" rx="3" fill="#cce4f7"/>
+      <rect x="66" y="26" width="36" height="20" rx="3" fill="#cce4f7"/>
+      <rect x="28" y="30" width="30" height="18" rx="3" fill="#cce4f7"/>
+      <line x1="144" y1="26" x2="144" y2="46" stroke="#999" stroke-width="1.2"/>
+      <line x1="102" y1="26" x2="102" y2="46" stroke="#999" stroke-width="1.2"/>
+      <line x1="106" y1="24" x2="106" y2="74" stroke="#999" stroke-width="1.5"/>
+      <rect x="90" y="50" width="10" height="3" rx="1.5" fill="#777"/>
+      <path d="M 195 35 Q 208 42 210 55 L 210 68 L 196 68 L 196 35 Z" fill="#aaa"/>
+      <ellipse cx="205" cy="42" rx="6" ry="5" fill="#fff9c4"/>
+      <ellipse cx="205" cy="42" rx="3" ry="3" fill="#ffe566"/>
+      <rect x="197" y="55" width="12" height="8" rx="2" fill="#666"/>
+      <rect x="196" y="66" width="14" height="5" rx="2" fill="#777"/>
+      <rect x="16" y="40" width="6" height="10" rx="2" fill="#ff6b6b"/>
+      <rect x="16" y="52" width="6" height="6" rx="1" fill="#ff9900"/>
+      <rect x="16" y="66" width="8" height="5" rx="2" fill="#777"/>
+      <circle cx="175" cy="82" r="14" fill="#2c2c2c"/><circle cx="175" cy="82" r="9" fill="#4a4a4a"/><circle cx="175" cy="82" r="3.5" fill="#aaa"/>
+      <circle cx="55" cy="82" r="14" fill="#2c2c2c"/><circle cx="55" cy="82" r="9" fill="#4a4a4a"/><circle cx="55" cy="82" r="3.5" fill="#aaa"/>
+      <path d="M 150 78 Q 175 66 200 78" stroke="#888" stroke-width="2" fill="none"/>
+      <path d="M 30 78 Q 55 66 80 78" stroke="#888" stroke-width="2" fill="none"/>
+      <rect x="207" y="44" width="7" height="5" rx="2" fill="#999"/>
+    </svg>
+  </div>`;
+
+  var truckIcon = L.divIcon({
+    html: truckSVG,
+    className: '',
+    iconAnchor: [55, 82]
+  });
+
+  var marker = L.marker([45.464, 9.19], { icon: truckIcon }).addTo(map);
+  var routeLine = null;
+  var waypoints = [];
+  var routeCoords = [];
+  var animIdx = 0;
+  var animTimer = null;
+  var paused = false;
+
+  document.getElementById('speed').addEventListener('input', function() {
+    document.getElementById('speed-out').textContent = this.value;
+  });
+
+  function setStatus(msg) { document.getElementById('status').textContent = msg; }
+
+  function moveTo(lat, lng) {
+    marker.setLatLng([lat, lng]);
+    map.panTo([lat, lng]);
+  }
+
+  function askPassword() {
+    var pwd = prompt("Password admin:");
+    if (pwd === PASSWORD) openAdmin();
+    else if (pwd !== null) alert("Password errata.");
+  }
+
+  function openAdmin() {
+    document.getElementById('admin-overlay').classList.add('open');
+  }
+
+  function closeAdmin() {
+    document.getElementById('admin-overlay').classList.remove('open');
+  }
+
+  function geocodeAddress() {
+    var addr = document.getElementById('addr-input').value.trim();
+    if (!addr) return;
+    fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(addr))
+      .then(r => r.json())
+      .then(data => {
+        if (!data.length) { setStatus('Indirizzo non trovato.'); return; }
+        moveTo(parseFloat(data[0].lat), parseFloat(data[0].lon));
+        setStatus('Posizione: ' + data[0].display_name.split(',').slice(0,2).join(','));
+      });
+  }
+
+  function setManual() {
+    var lat = parseFloat(document.getElementById('lat-input').value);
+    var lng = parseFloat(document.getElementById('lng-input').value);
+    if (isNaN(lat) || isNaN(lng)) { setStatus('Lat/Lng non validi.'); return; }
+    moveTo(lat, lng);
+    setStatus('Posizione impostata.');
+  }
+
+  function addWaypoint() {
+    var val = document.getElementById('wp-input').value.trim();
+    if (!val) return;
+    waypoints.push(val);
+    document.getElementById('wp-input').value = '';
+    renderWaypointList();
+  }
+
+  function renderWaypointList() {
+    var list = document.getElementById('wp-list');
+    list.innerHTML = waypoints.map((w, i) =>
+      `<div class="wp-item"><span>${i+1}. ${w}</span><button class="remove-btn" onclick="removeWP(${i})">rimuovi</button></div>`
+    ).join('');
+  }
+
+  function removeWP(i) { waypoints.splice(i, 1); renderWaypointList(); }
+
+  function geocodeAll(names, cb) {
+    var coords = [], i = 0;
+    function next() {
+      if (i >= names.length) { cb(coords); return; }
+      fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(names[i]))
+        .then(r => r.json())
+        .then(data => {
+          if (data.length) coords.push([parseFloat(data[0].lat), parseFloat(data[0].lon)]);
+          i++; next();
+        });
+    }
+    next();
+  }
+
+  function fetchOSRM(coords, cb) {
+    var pts = coords.map(c => c[1] + ',' + c[0]).join(';');
+    var url = 'https://router.project-osrm.org/route/v1/driving/' + pts + '?overview=full&geometries=geojson';
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        var route = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+        cb(route);
+      });
+  }
+
+  function startRoute() {
+    if (waypoints.length < 2) { setStatus('Aggiungi almeno 2 tappe.'); return; }
+    if (animTimer) clearInterval(animTimer);
+    setStatus('Calcolo percorso...');
+    geocodeAll(waypoints, function(coords) {
+      if (coords.length < 2) { setStatus('Tappe non trovate.'); return; }
+      fetchOSRM(coords, function(route) {
+        routeCoords = route;
+        animIdx = 0;
+        paused = false;
+        if (routeLine) map.removeLayer(routeLine);
+        routeLine = L.polyline(route, { color: '#2a5a8c', weight: 4, opacity: 0.7 }).addTo(map);
+        map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+        var speed = parseInt(document.getElementById('speed').value);
+        var interval = Math.max(30, 300 - speed * 28);
+        animTimer = setInterval(function() {
+          if (paused) return;
+          if (animIdx >= routeCoords.length) {
+            clearInterval(animTimer);
+            setStatus('Percorso completato.');
+            return;
+          }
+          marker.setLatLng(routeCoords[animIdx]);
+          animIdx++;
+        }, interval);
+        setStatus('In movimento...');
+      });
+    });
+  }
+
+  function pauseRoute() { paused = !paused; setStatus(paused ? 'In pausa.' : 'Ripreso.'); }
+
+  function resetRoute() {
+    if (animTimer) clearInterval(animTimer);
+    animIdx = 0; paused = false; waypoints = [];
+    renderWaypointList();
+    if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+    setStatus('Reset effettuato.');
+  }
+</script>
+</body>
+</html>
