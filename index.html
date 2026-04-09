@@ -118,11 +118,18 @@
     </div>
     <div id="wp-list"></div>
 
-    <div class="speed-row" style="margin-top:10px;">
-      <label>Velocità</label>
-      <input type="range" id="speed" min="1" max="10" value="4" step="1"/>
-      <span id="speed-out" style="font-size:13px; min-width:16px;">4</span>
-    </div>
+<div class="speed-row" style="margin-top:10px;">
+  <label>Durata</label>
+  <input type="number" id="duration-input" placeholder="es. 45" min="1" style="width:70px;"/>
+  <span style="font-size:13px; color:#666;">minuti</span>
+  <span style="font-size:12px; color:#aaa; margin-left:8px;">oppure</span>
+</div>
+<div class="speed-row" style="margin-top:6px;">
+  <label>Velocità</label>
+  <input type="range" id="speed" min="1" max="10" value="4" step="1" style="flex:1;"/>
+  <span id="speed-out" style="font-size:13px; min-width:16px;">4</span>
+</div>
+<div style="font-size:11px; color:#aaa; margin-top:4px;">Se inserisci i minuti, la velocità viene ignorata.</div>
 
     <div class="btn-row">
       <button onclick="startRoute()">Avvia</button>
@@ -243,35 +250,54 @@ var truckIcon = L.divIcon({
       });
   }
 
-  function startRoute() {
-    if (waypoints.length < 2) { setStatus('Aggiungi almeno 2 tappe.'); return; }
-    if (animTimer) clearInterval(animTimer);
-    setStatus('Calcolo percorso...');
-    geocodeAll(waypoints, function(coords) {
-      if (coords.length < 2) { setStatus('Tappe non trovate.'); return; }
-      fetchOSRM(coords, function(route) {
-        routeCoords = route;
-        animIdx = 0;
-        paused = false;
-        if (routeLine) map.removeLayer(routeLine);
-        routeLine = L.polyline(route, { color: '#2a5a8c', weight: 4, opacity: 0.7 }).addTo(map);
-        map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+function startRoute() {
+  if (waypoints.length < 2) { setStatus('Aggiungi almeno 2 tappe.'); return; }
+  if (animTimer) clearInterval(animTimer);
+  setStatus('Calcolo percorso...');
+  geocodeAll(waypoints, function(coords) {
+    if (coords.length < 2) { setStatus('Tappe non trovate.'); return; }
+    fetchOSRM(coords, function(route) {
+      routeCoords = route;
+      animIdx = 0;
+      paused = false;
+      if (routeLine) map.removeLayer(routeLine);
+      routeLine = L.polyline(route, { color: '#2a5a8c', weight: 4, opacity: 0.7 }).addTo(map);
+      map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+
+      var interval;
+      var durationMin = parseFloat(document.getElementById('duration-input').value);
+
+      if (!isNaN(durationMin) && durationMin > 0) {
+        // Durata in minuti → calcola interval per coprire tutti i punti in quel tempo
+        var totalMs = durationMin * 60 * 1000;
+        interval = Math.max(16, Math.floor(totalMs / routeCoords.length));
+        setStatus('Percorso in ' + durationMin + ' min (' + routeCoords.length + ' punti)');
+      } else {
+        // Fallback su velocità slider
         var speed = parseInt(document.getElementById('speed').value);
-        var interval = Math.max(30, 300 - speed * 28);
-        animTimer = setInterval(function() {
-          if (paused) return;
-          if (animIdx >= routeCoords.length) {
-            clearInterval(animTimer);
-            setStatus('Percorso completato.');
-            return;
-          }
-          marker.setLatLng(routeCoords[animIdx]);
-          animIdx++;
-        }, interval);
+        interval = Math.max(30, 300 - speed * 28);
         setStatus('In movimento...');
-      });
+      }
+
+      animTimer = setInterval(function() {
+        if (paused) return;
+        if (animIdx >= routeCoords.length) {
+          clearInterval(animTimer);
+          setStatus('Percorso completato.');
+          return;
+        }
+        marker.setLatLng(routeCoords[animIdx]);
+        animIdx++;
+
+        // Aggiorna status con tempo rimanente
+        if (!isNaN(durationMin) && durationMin > 0) {
+          var remaining = Math.ceil((routeCoords.length - animIdx) * interval / 60000);
+          setStatus('In movimento... ~' + remaining + ' min rimanenti');
+        }
+      }, interval);
     });
-  }
+  });
+}
 
   function pauseRoute() { paused = !paused; setStatus(paused ? 'In pausa.' : 'Ripreso.'); }
 
