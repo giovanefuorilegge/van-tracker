@@ -146,36 +146,11 @@
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
-  var truckSVG = `
-  <div id="truck-marker">
-    <svg width="110" height="60" viewBox="0 0 220 110" xmlns="http://www.w3.org/2000/svg">
-      <path d="M 20 75 L 20 48 Q 20 35 32 30 L 80 22 L 160 22 Q 185 22 195 35 L 200 48 L 200 75 Z" fill="#b5b5b5"/>
-      <path d="M 32 30 Q 20 35 20 48 L 20 38 Q 22 28 34 24 L 80 22 L 160 22 Q 183 22 193 33 L 195 35 Q 185 22 160 22 L 80 22 Z" fill="#cecece"/>
-      <rect x="20" y="65" width="180" height="10" rx="3" fill="#888"/>
-      <path d="M 155 24 Q 185 24 196 38 L 196 52 L 150 52 Z" fill="#cce4f7"/>
-      <line x1="173" y1="24" x2="173" y2="52" stroke="#aac" stroke-width="1"/>
-      <rect x="108" y="26" width="36" height="20" rx="3" fill="#cce4f7"/>
-      <rect x="66" y="26" width="36" height="20" rx="3" fill="#cce4f7"/>
-      <rect x="28" y="30" width="30" height="18" rx="3" fill="#cce4f7"/>
-      <line x1="144" y1="26" x2="144" y2="46" stroke="#999" stroke-width="1.2"/>
-      <line x1="102" y1="26" x2="102" y2="46" stroke="#999" stroke-width="1.2"/>
-      <line x1="106" y1="24" x2="106" y2="74" stroke="#999" stroke-width="1.5"/>
-      <rect x="90" y="50" width="10" height="3" rx="1.5" fill="#777"/>
-      <path d="M 195 35 Q 208 42 210 55 L 210 68 L 196 68 L 196 35 Z" fill="#aaa"/>
-      <ellipse cx="205" cy="42" rx="6" ry="5" fill="#fff9c4"/>
-      <ellipse cx="205" cy="42" rx="3" ry="3" fill="#ffe566"/>
-      <rect x="197" y="55" width="12" height="8" rx="2" fill="#666"/>
-      <rect x="196" y="66" width="14" height="5" rx="2" fill="#777"/>
-      <rect x="16" y="40" width="6" height="10" rx="2" fill="#ff6b6b"/>
-      <rect x="16" y="52" width="6" height="6" rx="1" fill="#ff9900"/>
-      <rect x="16" y="66" width="8" height="5" rx="2" fill="#777"/>
-      <circle cx="175" cy="82" r="14" fill="#2c2c2c"/><circle cx="175" cy="82" r="9" fill="#4a4a4a"/><circle cx="175" cy="82" r="3.5" fill="#aaa"/>
-      <circle cx="55" cy="82" r="14" fill="#2c2c2c"/><circle cx="55" cy="82" r="9" fill="#4a4a4a"/><circle cx="55" cy="82" r="3.5" fill="#aaa"/>
-      <path d="M 150 78 Q 175 66 200 78" stroke="#888" stroke-width="2" fill="none"/>
-      <path d="M 30 78 Q 55 66 80 78" stroke="#888" stroke-width="2" fill="none"/>
-      <rect x="207" y="44" width="7" height="5" rx="2" fill="#999"/>
-    </svg>
-  </div>`;
+ var truckIcon = L.divIcon({
+  html: '<img src="van.png" style="width:80px; animation: squish 0.55s ease-in-out infinite alternate; transform-origin: bottom center;">',
+  className: '',
+  iconAnchor: [40, 50]
+});
 
   var truckIcon = L.divIcon({
     html: truckSVG,
