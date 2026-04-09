@@ -78,10 +78,6 @@
     .speed-row { display: flex; align-items: center; gap: 8px; }
     .speed-row label { font-size: 13px; color: #666; }
 
-    #truck-marker {
-      animation: squish 0.55s ease-in-out infinite alternate;
-      transform-origin: bottom center;
-    }
     @keyframes squish {
       0%   { transform: scaleY(1)    scaleX(1)    translateY(0px); }
       40%  { transform: scaleY(1.06) scaleX(0.96) translateY(-7px); }
@@ -139,17 +135,17 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-  const PASSWORD = "filarmonica";  // <-- cambia qui la tua password
+  const PASSWORD = "filarmonica";
 
   var map = L.map('map', { zoomControl: true }).setView([45.464, 9.19], 13);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
- var truckIcon = L.divIcon({
+var truckIcon = L.divIcon({
   html: '<img src="van.png" style="width:80px; animation: squish 0.55s ease-in-out infinite alternate; transform-origin: bottom center;">',
   className: '',
-  iconAnchor: [40, 50]
+  iconAnchor: [40, 40]
 });
 
   var marker = L.marker([45.464, 9.19], { icon: truckIcon }).addTo(map);
